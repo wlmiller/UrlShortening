@@ -1,12 +1,14 @@
-﻿namespace Durwella.UrlShortening
+﻿using System.Threading.Tasks;
+
+namespace Durwella.UrlShortening
 {
     public interface IAliasRepository
     {
-        void Add(string key, string value);
-        bool Remove(string key);
-        bool ContainsKey(string key);
-        bool ContainsValue(string value);
-        string GetKey(string value);
-        string GetValue(string key);
+        Task Add(string key, string value);
+        Task<bool> Remove(string key);
+        Task<bool> ContainsKey(string key);
+        Task<bool> ContainsValue(string value);
+        Task<string> GetKey(string value);
+        Task<string> GetValue(string key);
     }
 }

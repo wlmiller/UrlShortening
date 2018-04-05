@@ -2,10 +2,11 @@
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Auth;
 using Microsoft.WindowsAzure.Storage.Table;
-using NUnit.Framework;
 using System;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
+using Xunit;
 
 // The tests here run against a live Azure Storage account.
 // So, to run them you need to populate AzureTestCredentials.txt with two lines:
@@ -18,70 +19,77 @@ using System.Threading;
 
 namespace Durwella.UrlShortening.Tests
 {
-    [Explicit]
-    public class AzureTableAliasRepositoryTest
+    public class AzureTableAliasRepositoryFixture : IDisposable
     {
-        private static string _azureStorageAccountName;
-        private static string _azureStorageAccessKey;
-        private static bool _enabled = false;
-        private static readonly string _tablePrefix = "UrlShorteningTest";
-        private static CloudTable _table;
-        private AzureTableAliasRepository _subject;
+        public string AzureStorageAccountName { get; }
+        public string AzureStorageAccessKey { get; }
+        public string TablePrefix => "UrlShorteningTest";
+        public CloudTable Table { get; }
+        public AzureTableAliasRepository Subject { get; }
 
-        [TestFixtureSetUp]
-        public static void LoadAzureCredentials()
+        public AzureTableAliasRepositoryFixture()
         {
             var credentialsFile = File.ReadAllLines("AzureTestCredentials.txt");
             if (credentialsFile.Length < 2
                 || String.IsNullOrWhiteSpace(credentialsFile[0])
                 || String.IsNullOrWhiteSpace(credentialsFile[1]))
                 return;
-            _azureStorageAccountName = credentialsFile[0];
-            _azureStorageAccessKey = credentialsFile[1];
-            _enabled = true;
-            var credentials = new StorageCredentials(_azureStorageAccountName, _azureStorageAccessKey);
+            AzureStorageAccountName = credentialsFile[0];
+            AzureStorageAccessKey = credentialsFile[1];
+            var credentials = new StorageCredentials(AzureStorageAccountName, AzureStorageAccessKey);
             var account = new CloudStorageAccount(credentials, useHttps: true);
             var tableClient = account.CreateCloudTableClient();
-            _table = tableClient.GetTableReference(_tablePrefix);
+            Table = tableClient.GetTableReference(TablePrefix);
             // Delete all the test entries from the test table
             // Deleting the table itself is too slow because it cannot be immediately recreated
             for (int i = 0; i < 10; i++)
             {
                 var key = "TheTestKey" + i.ToString();
                 var retrieveOp = TableOperation.Retrieve(AzureTableAliasRepository.Partition, key);
-                var result = _table.Execute(retrieveOp);
+                var result = Table.ExecuteAsync(retrieveOp).Result;
                 if (result.Result != null)
                 {
                     var deleteOp = TableOperation.Delete(result.Result as ITableEntity);
-                    _table.Execute(deleteOp);
+                    Table.ExecuteAsync(deleteOp).Wait();
                 }
             }
         }
 
-        [SetUp]
-        public void IgnoreIfDisabled()
+        public void Dispose()
         {
-            if (!_enabled) 
-                Assert.Ignore("Populate AzureTestCredentials.txt for this test");
-            _subject = new AzureTableAliasRepository(_azureStorageAccountName, _azureStorageAccessKey, _tablePrefix);
+            // ... clean up test data from the database ...
+        }
+    }
+
+    public class AzureTableAliasRepositoryTest: IClassFixture<AzureTableAliasRepositoryFixture>
+    {
+        private const string skip = "Populate AzureTestCredentials.txt for this test";
+
+        private readonly AzureTableAliasRepositoryFixture _fixture;
+        private readonly AzureTableAliasRepository _subject;
+        public AzureTableAliasRepositoryTest(AzureTableAliasRepositoryFixture fixture)
+        {
+            _fixture = fixture;
+            _subject = new AzureTableAliasRepository(
+                fixture.AzureStorageAccountName, fixture.AzureStorageAccessKey, fixture.TablePrefix);
         }
 
-        [Test]
-        public void ShouldCreateTableWhenConstructed()
+        [Fact(Skip = skip)]
+        public async Task ShouldCreateTableWhenConstructed()
         {
-            _table.Exists().Should().BeTrue();
+            (await _fixture.Table.ExistsAsync()).Should().BeTrue();
         }
 
-        [Test]
-        public void ShouldAddKeyValueEntity()
+        [Fact(Skip = skip)]
+        public async Task ShouldAddKeyValueEntity()
         {
             var key = "TheTestKey0";
             var value = "TheTestValue0";
 
-            _subject.Add(key, value);
+            await _subject.Add(key, value);
 
             var retrieveOp = TableOperation.Retrieve(AzureTableAliasRepository.Partition, key);
-            var result = _table.Execute(retrieveOp);
+            var result = await _fixture.Table.ExecuteAsync(retrieveOp);
             result.Should().NotBeNull();
             var entity = (ITableEntity)result.Result;
             entity.RowKey.Should().Be(key);
@@ -89,98 +97,98 @@ namespace Durwella.UrlShortening.Tests
             properties["Value"].StringValue.Should().Be(value);
         }
 
-        [Test]
-        public void ShouldReportContainsKeyAfterAdding()
+        [Fact(Skip = skip)]
+        public async Task ShouldReportContainsKeyAfterAdding()
         {
             var key = "TheTestKey1";
             var value = "TheTestValue1";
-            _subject.ContainsKey(key).Should().BeFalse();
+            (await _subject.ContainsKey(key)).Should().BeFalse();
 
-            _subject.Add(key, value);
+            await _subject.Add(key, value);
 
-            _subject.ContainsKey(key).Should().BeTrue();
+            (await _subject.ContainsKey(key)).Should().BeTrue();
         }
 
-        [Test]
-        public void ShouldReportContainsValueAfterAdding()
+        [Fact(Skip = skip)]
+        public async Task ShouldReportContainsValueAfterAdding()
         {
             var key = "TheTestKey2";
             var value = "TheTestValue2";
-            _subject.ContainsValue(value).Should().BeFalse();
+            (await _subject.ContainsValue(value)).Should().BeFalse();
 
-            _subject.Add(key, value);
+            await _subject.Add(key, value);
 
-            _subject.ContainsValue(value).Should().BeTrue();
+            (await _subject.ContainsValue(value)).Should().BeTrue();
         }
 
-        [Test]
-        public void ShouldRetrieveValueAfterAdding()
+        [Fact(Skip = skip)]
+        public async Task ShouldRetrieveValueAfterAdding()
         {
             var key = "TheTestKey3";
             var value = "TheTestValue3";
 
-            _subject.Add(key, value);
+            await _subject.Add(key, value);
 
-            _subject.GetValue(key).Should().Be(value);
+            (await _subject.GetValue(key)).Should().Be(value);
         }
 
-        [Test]
-        public void ShouldRetrieveKeyAfterAdding()
+        [Fact(Skip = skip)]
+        public async Task ShouldRetrieveKeyAfterAdding()
         {
             var key = "TheTestKey4";
             var value = "TheTestValue4";
 
-            _subject.Add(key, value);
+            await _subject.Add(key, value);
 
-            _subject.GetKey(value).Should().Be(key);
+            (await _subject.GetKey(value)).Should().Be(key);
         }
 
-        [Test]
-        public void ShouldRemoveByKey()
+        [Fact(Skip = skip)]
+        public async Task ShouldRemoveByKey()
         {
             var key = "TheTestKey5";
             var value = "TheTestValue5";
-            _subject.Add(key, value);
-            _subject.ContainsKey(key).Should().BeTrue();
+            await _subject.Add(key, value);
+            (await _subject.ContainsKey(key)).Should().BeTrue();
 
-            var didRemove = _subject.Remove(key);
+            var didRemove = await _subject.Remove(key);
 
-            _subject.ContainsKey(key).Should().BeFalse();
+            (await _subject.ContainsKey(key)).Should().BeFalse();
             didRemove.Should().BeTrue();
         }
 
-        [Test]
-        public void ShouldReturnFalseIfKeyNotPresentForRemoval()
+        [Fact(Skip = skip)]
+        public async Task ShouldReturnFalseIfKeyNotPresentForRemoval()
         {
             var key = "TheTestKey6";
-            _subject.ContainsKey(key).Should().BeFalse();
+            (await _subject.ContainsKey(key)).Should().BeFalse();
 
-            var didRemove = _subject.Remove(key);
+            var didRemove = await _subject.Remove(key);
 
             didRemove.Should().BeFalse();
         }
 
-        [Test]
-        public void ShouldPreventRemovalAfterLockTimeSpan()
+        [Fact(Skip = skip)]
+        public async Task ShouldPreventRemovalAfterLockTimeSpan()
         {
             _subject.LockAge = TimeSpan.FromSeconds(2);
             var key1 = "TheTestKey7";
-            _subject.Add(key1, "value");
+            await _subject.Add(key1, "value");
             var key2 = "TheTestKey8";
-            _subject.Add(key2, "value8");
-            _subject.Remove(key2).Should().BeTrue("Can remove key that is young enough");
+            await _subject.Add(key2, "value8");
+            (await _subject.Remove(key2)).Should().BeTrue("Can remove key that is young enough");
             Thread.Sleep(3000);
 
             try
             {
-                _subject.Remove(key1);
+                await _subject.Remove(key1);
             }
             catch (Exception)
             {
                 return;
             }
 
-            Assert.Fail("Should throw when trying to remove key that is too old");
+            Assert.True(false, "Should throw when trying to remove key that is too old");
         }
     }
 }

@@ -3,6 +3,7 @@ using Microsoft.WindowsAzure.Storage.Auth;
 using Microsoft.WindowsAzure.Storage.Table;
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Durwella.UrlShortening
 {
@@ -61,56 +62,61 @@ namespace Durwella.UrlShortening
             LockAge = TimeSpan.FromHours(12);
             var tableClient = account.CreateCloudTableClient();
             _table = tableClient.GetTableReference(tablePrefix);
-            _table.CreateIfNotExists();
+            _table.CreateIfNotExistsAsync().Wait();
         }
 
-        public void Add(string key, string value)
+        public async Task Add(string key, string value)
         {
             var entity = new Entity(key, value);
             var insertOperation = TableOperation.InsertOrReplace(entity);
-            _table.Execute(insertOperation);
+            await _table.ExecuteAsync(insertOperation);
         }
 
-        public bool Remove(string key)
+        public async Task<bool> Remove(string key)
         {
-            var entity = RetrieveEntity(key);
+            var entity = await RetrieveEntity(key);
+
             if (entity == null)
                 return false;
+
             var entityAge = DateTimeOffset.UtcNow.Subtract(entity.Timestamp);
+
             if (entityAge > LockAge)
                 throw new InvalidOperationException("Cannot change a short URL that is too old.");
+
             var removeOperation = TableOperation.Delete(entity);
-            _table.Execute(removeOperation);
+            await _table.ExecuteAsync(removeOperation);
+
             return true;
         }
 
-        public bool ContainsKey(string key)
+        public async Task<bool> ContainsKey(string key)
         {
-            var entity = RetrieveEntity(key);
+            var entity = await RetrieveEntity(key);
             return entity != null;
         }
 
-        public bool ContainsValue(string value)
+        public async Task<bool> ContainsValue(string value)
         {
-            return _table.ExecuteQuery(WhereValueIs(value)).Any();
+            return (await _table.ExecuteQuerySegmentedAsync(WhereValueIs(value), null)).Any();
         }
 
-        public string GetKey(string value)
+        public async Task<string> GetKey(string value)
         {
-            var entity = _table.ExecuteQuery(WhereValueIs(value)).Single();
+            var entity = (await _table.ExecuteQuerySegmentedAsync(WhereValueIs(value), null)).First();
             return entity.RowKey;
         }
 
-        public string GetValue(string key)
+        public async Task<string> GetValue(string key)
         {
-            var entity = RetrieveEntity(key);
+            var entity = await RetrieveEntity(key);
             return entity.Value;
         }
 
-        private Entity RetrieveEntity(string key)
+        private async Task<Entity> RetrieveEntity(string key)
         {
             var op = TableOperation.Retrieve<Entity>(Partition, key);
-            var result = _table.Execute(op);
+            var result = await _table.ExecuteAsync(op);
             var entity = (Entity) result.Result;
             return entity;
         }

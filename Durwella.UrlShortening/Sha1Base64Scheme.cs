@@ -3,9 +3,9 @@
     public class Sha1Base64Scheme :
         BaseHashScheme<Sha1HashFunction, Base64StringEncoder>
     {
-        public Sha1Base64Scheme()
+        public Sha1Base64Scheme(IConfigSettings config)
         {
-            LengthPreference = 4;
+            LengthPreference = config?.PreferredHashLength ?? 4;
         }
     }
 }

@@ -1,13 +1,13 @@
 ﻿using FluentAssertions;
-using NUnit.Framework;
 using System;
 using System.Linq;
+using Xunit;
 
 namespace Durwella.UrlShortening.Tests
 {
     public class HashSchemesTest
     {
-        [Test]
+        [Fact]
         public void VerifyAllHashSchemes()
         {
             var interfaceType = typeof(IHashScheme);
@@ -16,7 +16,15 @@ namespace Durwella.UrlShortening.Tests
                 .Where(p => interfaceType.IsAssignableFrom(p) && p.IsClass && !p.IsAbstract);
             foreach (var hashScheme in hashSchemes)
             {
-                var scheme = (IHashScheme) Activator.CreateInstance(hashScheme);
+                IHashScheme scheme;
+                if (hashScheme.GetConstructor(Type.EmptyTypes) != null)
+                {
+                    scheme = (IHashScheme)Activator.CreateInstance(hashScheme);
+                }
+                else
+                {
+                    scheme = (IHashScheme)Activator.CreateInstance(hashScheme, default(IConfigSettings));
+                }
                 var name = hashScheme.Name;
                 PrintExamples(scheme, name);
                 ShouldHaveDefaultLengthPreference(scheme, name);

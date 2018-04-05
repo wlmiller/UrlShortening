@@ -1,0 +1,70 @@
+<div class="container" ng-app="urlShortenerApp">
+  <div ng-controller="urlShortenerCtrl">
+      <div class="pull-right">
+          <button type="button" class="btn btn-default"
+                  *ngIf="!authService.isAuthenticated"
+                  aria-label="Sign in"
+                  tooltip-placement="bottom" tooltip="Sign in" (click)="showLogin()">
+              <span class="glyphicon glyphicon-log-in"></span>
+          </button>
+          <button type="button" class="btn btn-default"
+                  *ngIf="authService.isAuthenticated"
+                  aria-label="Sign out"
+                  tooltip-placement="bottom" tooltip="Sign out" (click)="logout()">
+              <span class="glyphicon glyphicon-log-out"></span>
+          </button>
+      </div>
+
+      <h1>URL Shortener</h1>
+
+      <div>
+          <div>
+              <form (ngSubmit)="submitLongUrl(longUrl, customPath)" name="shortenForm">
+                  <input class="form-control input-lg"
+                         [(ngModel)]="longUrl" id="LongUrl" name="longURl"
+                         autofocus
+                         type="url" placeholder="Paste your long URL">
+                  <input class="form-control input-sm"
+                         [(ngModel)]="customPath" id="CustomPath" name="customPath"
+                         type="text" placeholder="Type a custom short path (optional)" style="margin-top: 5px">
+                  <input class="btn btn-primary" style="margin-top: 5px"
+                         (disabled)="!longUrl || waiting"
+                         type="submit" name="go" value="Shorten!" />
+              </form>
+              <div style="margin-top: 15px"></div>
+              <div class="container danger alert-danger" *ngIf="errorMessage" >
+                  <h4>{{errorMessage}}</h4>
+              </div>
+              <h3 *ngIf="shortenedUrl">
+                  <a href="{{shortenedUrl}}" target="_blank">{{ shortenedUrl }}</a>
+              </h3>
+          </div>
+      </div>
+  </div>
+</div>
+
+<ng-template #loginTemplate>
+  <div class="modal-header">
+    <h4 class="modal-title">Authorization Required</h4>
+</div>
+
+<div class="modal-body">
+    <form class="form-signin" (ngSubmit)="submitLogin(userName, password)">
+        <h2 class="form-signin-heading">Please sign in</h2>
+        <div class="form-group">
+            <label for="inputEmail" class="sr-only">User name</label>
+            <input type="text" id="inputEmail" class="form-control"
+                    [(ngModel)]="userName" name="userName"
+                    placeholder="User name" required autofocus>
+        </div>
+        <div class="form-group">
+            <label for="inputPassword" class="sr-only">Password</label>
+            <input type="password" id="inputPassword" class="form-control"
+                    [(ngModel)]="password" name="password"
+                    placeholder="Password" required>
+        </div>
+        <button class="btn btn-primary" type="submit" [disabled]="!userName || !password">Sign in</button>
+        <h4 class="bg-danger" style="padding: 15px" *ngIf="loginErrorMessage">{{loginErrorMessage}}</h4>
+    </form>
+</div>
+</ng-template>
